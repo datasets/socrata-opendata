@@ -1,8 +1,8 @@
-# FiveThirtyEight datasets
+# Socrata open datasets
 
 ## Data
 
-In `datasets` directory over 100 datasets are located.
+In `datasets` directory over 350 datasets are located.
 
 ## Preparation
 
@@ -14,4 +14,4 @@ Scripts are in directory `scripts`
 
 Running `main.py` should update the whole dataset.
 
-Those datasets are scraped from [FiveThirtyEight](https://github.com/fivethirtyeight/data)
+Those datasets are scraped from [Socrata-opendata](https://opendata.socrata.com/)
