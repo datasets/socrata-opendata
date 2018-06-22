@@ -2,23 +2,36 @@ import csv
 import json
 import os
 import shutil
+import urllib
+from urllib.error import HTTPError
 from urllib.request import urlopen
 
 from bs4 import BeautifulSoup
 from datapackage import Package
 
+
+url = 'https://opendata.socrata.com/browse?'
 raw_data_url = 'https://opendata.socrata.com/api/views'
 category = ''
 
 
 def init(file='generated_links.txt'):
-    # generate_links()
-    # generate_dataset('https://opendata.socrata.com/Education/Archaeological-Websites/dtht-mdpt')
+    links_empty = False
+    with open(file, "r") as links:
+        if len(links.readlines()) == 0:
+           links_empty = True
+
+    if links_empty:
+        generate_links()
+
     with open(file, "r") as links:
         for i, link in enumerate(links.readlines()):
             link = link.strip()
             print(str(i) + ': ' + str(link))
-            generate_dataset(link)
+            try:
+                generate_dataset(link)
+            except HTTPError:
+                print('Error occured')
 
 
 def generate_dataset(url):
@@ -28,6 +41,8 @@ def generate_dataset(url):
         return
 
     csv_url = raw_data_url + url[url.rindex('/'):] + '/rows.csv?accessType=DOWNLOAD'
+
+    rows = []
 
     title = url[len('https://opendata.socrata.com/'+category+'/'): url.rindex('/')].lower()
     directory = "datasets/" + category + '/' + title
@@ -51,7 +66,9 @@ def generate_dataset(url):
 
             decoded_line = decoded_line.strip().lower()
             decoded_line = decoded_line.replace('"', '')
-            output_file.write(decoded_line + '\n')
+            if decoded_line not in rows:
+                output_file.write(decoded_line + '\n')
+                rows.append(decoded_line)
 
     number_of_rows = 0
     with open(directory + "/data/" + title + '.csv', "r", encoding='utf-8') as output_file:
@@ -59,7 +76,7 @@ def generate_dataset(url):
         for row in reader:
             number_of_rows += 1
 
-    if number_of_rows < 2:
+    if number_of_rows < 50:
         shutil.rmtree(directory)
         return
 
@@ -105,6 +122,9 @@ def datapackage_creator(location, title, name, source_title, source_path):
     package_json = package.descriptor
     del package_json['profile']
 
+    for resource in package_json['resources']:
+        resource['path'] = resource['path'][len(location) + 1:]
+
     if package.valid:
         with open(location + '/datapackage.json', 'w') as data_file:
             json.dump(package_json, data_file, indent=4, sort_keys=True)
@@ -112,6 +132,28 @@ def datapackage_creator(location, title, name, source_title, source_path):
     else:
         print('DATAPACKAGE IS NOT VALID')
         return False
+
+
+def generate_links():
+    open('generated_links.txt', "w", encoding='ascii')
+    categories = ['Business', 'Demo', 'Education', 'Fun', 'Government', 'Personal', 'Public+Safety']
+    for category in categories:
+        print(category)
+        with open('generated_links.txt', "a") as generated_links:
+            generated_links.write('Category:' + category + '\n')
+        for i in range(10):
+            soup = BeautifulSoup(urlopen(url + 'category=' + category + '&limitTo=datasets&page=' + str(i+1)), 'html.parser')
+            with open('generated_links.txt', "a", encoding='ascii') as generated_links:
+                for a in soup.find_all('a'):
+                    clazz = a.get('class')
+                    if a and clazz and 'browse2-result-name-link' in clazz:
+                        href = a.get('href')
+                        try:
+                            generated_links.write(href + '\n')
+                            print(href)
+                        except UnicodeEncodeError:
+                            print('Error: ' + href)
+                            continue
 
 
 init()
